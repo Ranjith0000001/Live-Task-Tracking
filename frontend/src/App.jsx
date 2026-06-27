@@ -64,6 +64,8 @@ function App() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editText, setEditText] = useState("");
   const [dragTask, setDragTask] = useState(null);
+  // { columnId, index } — tracks which slot the dragged card is hovering over
+  const [dragOverInfo, setDragOverInfo] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -185,32 +187,80 @@ function App() {
     }
   };
 
-  // Drag & Drop
+  // ── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDragStart = (task) => {
     setDragTask(task);
   };
 
+  // Called on the column container — for inter-column drops only
   const handleDragOver = (e, columnId) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
 
+  // Called on each task card during hover — tracks insertion index
+  const handleCardDragEnter = (e, columnId, index) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverInfo({ columnId, index });
+  };
+
+  const handleCardDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   const handleDrop = async (e, targetStatus) => {
     e.preventDefault();
-    if (!dragTask || dragTask.status === targetStatus) {
-      setDragTask(null);
-      return;
-    }
-    try {
-      await axios.put(`${API}/${dragTask.id}`, { status: targetStatus });
-      setDragTask(null);
-    } catch (err) {
-      console.error("Error moving task:", err);
-      showSnackbar("Error moving task", "error");
+    if (!dragTask) { setDragTask(null); setDragOverInfo(null); return; }
+
+    const isSameColumn = dragTask.status === targetStatus;
+
+    if (isSameColumn) {
+      // ── Intra-column reorder ──
+      const column = tasks[targetStatus];
+      const fromIndex = column.findIndex(t => t.id === dragTask.id);
+      const toIndex   = dragOverInfo?.columnId === targetStatus ? dragOverInfo.index : column.length - 1;
+
+      if (fromIndex === -1 || fromIndex === toIndex) {
+        setDragTask(null); setDragOverInfo(null); return;
+      }
+
+      // Optimistic UI update
+      const reordered = [...column];
+      const [moved] = reordered.splice(fromIndex, 1);
+      const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
+      reordered.splice(insertAt, 0, moved);
+
+      setTasks(prev => ({ ...prev, [targetStatus]: reordered }));
+      setDragTask(null); setDragOverInfo(null);
+
+      try {
+        await axios.put(`${API}/reorder`, {
+          columnId: targetStatus,
+          orderedIds: reordered.map(t => t.id),
+        });
+      } catch (err) {
+        console.error("Error reordering:", err);
+        showSnackbar("Error saving order", "error");
+        // Revert on failure
+        setTasks(prev => ({ ...prev, [targetStatus]: column }));
+      }
+    } else {
+      // ── Inter-column move (existing behaviour unchanged) ──
+      setDragTask(null); setDragOverInfo(null);
+      try {
+        await axios.put(`${API}/${dragTask.id}`, { status: targetStatus });
+      } catch (err) {
+        console.error("Error moving task:", err);
+        showSnackbar("Error moving task", "error");
+      }
     }
   };
+
   const handleDragEnd = () => {
     setDragTask(null);
+    setDragOverInfo(null);
   };
 
 
@@ -426,30 +476,49 @@ function App() {
                       No tasks
                     </Typography>
                   ) : (
-                    tasks[column.id]?.map((task) => (
-                      <Paper
-                        key={task.id}
-                        elevation={1}
-                        draggable={isConnected}
-                        onDragStart={() => handleDragStart(task)}
-                        onDragEnd={handleDragEnd}
-                        sx={{
-                          p: 1.5,
-                          mb: 1.5,
-                          borderRadius: 2,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          cursor: isConnected ? "grab" : "default",
-                          transition: "all 0.2s",
-                          "&:hover": {
-                            boxShadow: isConnected ? 3 : 1,
-                            transform: isConnected ? "translateY(-1px)" : "none",
-                          },
-                          opacity: dragTask?.id === task.id ? 0.4 : 1,
-                          borderLeft: `4px solid ${column.color}`,
-                        }}
-                      >
+                    tasks[column.id]?.map((task, index) => (
+                      <Box key={task.id}>
+                        {/* Drop-indicator line — shown above this slot when dragging over it */}
+                        {dragTask &&
+                          dragTask.id !== task.id &&
+                          dragOverInfo?.columnId === column.id &&
+                          dragOverInfo?.index === index && (
+                            <Box
+                              sx={{
+                                height: 3,
+                                borderRadius: 99,
+                                bgcolor: column.color,
+                                mx: 0.5,
+                                mb: 0.75,
+                                opacity: 0.8,
+                                transition: 'opacity 0.15s',
+                              }}
+                            />
+                          )}
+                        <Paper
+                          elevation={1}
+                          draggable={isConnected}
+                          onDragStart={() => handleDragStart(task)}
+                          onDragEnd={handleDragEnd}
+                          onDragEnter={(e) => handleCardDragEnter(e, column.id, index)}
+                          onDragOver={handleCardDragOver}
+                          sx={{
+                            p: 1.5,
+                            mb: 1.5,
+                            borderRadius: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            cursor: isConnected ? "grab" : "default",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              boxShadow: isConnected ? 3 : 1,
+                              transform: isConnected ? "translateY(-1px)" : "none",
+                            },
+                            opacity: dragTask?.id === task.id ? 0.4 : 1,
+                            borderLeft: `4px solid ${column.color}`,
+                          }}
+                        >
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography
                             variant="body2"
@@ -495,7 +564,8 @@ function App() {
                         >
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
-                      </Paper>
+                        </Paper>
+                      </Box>
                     ))
                   )}
                 </Box>

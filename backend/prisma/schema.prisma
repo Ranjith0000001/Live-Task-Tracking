@@ -14,6 +14,7 @@ model Task {
   assignee  String
   deadline  DateTime
   effortHrs Float
+  position  Int      @default(0)       // stable sort order within a column
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

@@ -143,6 +143,18 @@ export function useWebSocket() {
                         });
                         break;
 
+                    case 'TASK_REORDERED':
+                        setBoardState(prev => {
+                            const { columnId, orderedIds } = data.payload;
+                            const column = prev[columnId] || [];
+                            // Re-sort existing tasks to match the server's authoritative order
+                            const sorted = orderedIds
+                                .map(id => column.find(t => t.id === id))
+                                .filter(Boolean);
+                            return { ...prev, [columnId]: sorted };
+                        });
+                        break;
+
                     default:
                         console.log('Unknown message type:', data.type);
                 }

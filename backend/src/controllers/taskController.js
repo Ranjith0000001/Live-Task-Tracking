@@ -1,5 +1,5 @@
 const taskService = require("../services/taskService");
-const { broadcastUpdate, updateCurrentState } = require("../websocket"); 
+const { broadcastUpdate, updateCurrentState } = require("../websocket");
 const { groupTasksByStatus } = require("../utils/taskUtils");
 
 const getAllTasks = async (req, res) => {
@@ -103,4 +103,34 @@ const deleteTask = async (req, res) => {
     }
 };
 
-module.exports = { getAllTasks, createTask, updateTask, deleteTask };
+// Reorder tasks within a column and broadcast the new order live
+const reorderTasks = async (req, res) => {
+    try {
+        const { columnId, orderedIds } = req.body;
+        if (!columnId || !Array.isArray(orderedIds)) {
+            return res.status(400).json({ error: "columnId and orderedIds[] are required" });
+        }
+        if (!['todo', 'inprogress', 'done'].includes(columnId)) {
+            return res.status(400).json({ error: "Invalid columnId" });
+        }
+
+        const updatedTasks = await taskService.reorderTasks(orderedIds);
+
+        // Refresh board state cache
+        const allTasks = await taskService.getAllTasks();
+        const groupedTasks = groupTasksByStatus(allTasks);
+        updateCurrentState(groupedTasks);
+
+        // Broadcast new column order to all connected clients
+        broadcastUpdate({
+            type: 'TASK_REORDERED',
+            payload: { columnId, orderedIds },
+        });
+
+        res.json({ columnId, tasks: updatedTasks });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+module.exports = { getAllTasks, createTask, updateTask, deleteTask, reorderTasks };
