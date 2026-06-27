@@ -29,6 +29,7 @@ import {
   MoreVert as MoreVertIcon,
   Wifi as WifiIcon,
   WifiOff as WifiOffIcon,
+  Sync as SyncIcon,
   Person as PersonIcon,
   CalendarToday as CalendarIcon,
   AccessTime as TimeIcon,
@@ -49,6 +50,8 @@ function App() {
   // Use WebSocket hook
   const {
     isConnected,
+    wsStatus,
+    reconnectIn,
     boardState: wsBoardState,
     setBoardState: setWsBoardState,
     connectedUsers = []
@@ -227,10 +230,13 @@ function App() {
     if (e.key === "Enter") handleAddTask();
   };
 
-  // Get connection status color
-  const getStatusColor = () => {
-    return isConnected ? "success.main" : "error.main";
+  // 3-state status config
+  const statusConfig = {
+    connected:    { label: 'Live',         color: '#2e7d32', bg: '#e8f5e9', dot: '#4caf50', icon: WifiIcon },
+    reconnecting: { label: reconnectIn > 0 ? `Reconnecting ${reconnectIn}s` : 'Reconnecting…', color: '#7c4f00', bg: '#fff8e1', dot: '#ff9800', icon: SyncIcon },
+    connecting:   { label: 'Connecting…',  color: '#1565c0', bg: '#e3f2fd', dot: '#2196f3', icon: SyncIcon },
   };
+  const sc = statusConfig[wsStatus] || statusConfig.connecting;
 
   return (
     <Box sx={{ bgcolor: "#f5f5f5", minHeight: "100vh", py: 4 }}>
@@ -246,24 +252,59 @@ function App() {
           </Typography>
           
           {/* Connection Status Badge */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {isConnected ? (
-              <WifiIcon sx={{ color: "success.main" }} />
-            ) : (
-              <WifiOffIcon sx={{ color: "error.main" }} />
-            )}
-            <Typography variant="body2" sx={{ color: getStatusColor() }}>
-              {isConnected ? "Live" : "Offline"}
-            </Typography>
-            <Chip
-              label={isConnected ? "🟢 Connected" : "🔴 Disconnected"}
-              size="small"
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+
+            {/* 3-state animated pill */}
+            <Box
               sx={{
-                bgcolor: isConnected ? "#e8f5e9" : "#ffebee",
-                color: isConnected ? "#2e7d32" : "#c62828",
-                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+                px: 1.25,
+                py: 0.4,
+                borderRadius: 99,
+                bgcolor: sc.bg,
+                border: `1px solid ${sc.dot}44`,
+                transition: 'all 0.4s ease',
               }}
-            />
+            >
+              {/* Animated dot */}
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: sc.dot,
+                  flexShrink: 0,
+                  ...(wsStatus !== 'connected' && {
+                    animation: 'wsPulse 1.2s ease-in-out infinite',
+                    '@keyframes wsPulse': {
+                      '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                      '50%':       { opacity: 0.35, transform: 'scale(0.75)' },
+                    },
+                  }),
+                }}
+              />
+              {/* Spinning icon while not connected */}
+              {wsStatus !== 'connected' && (
+                <SyncIcon
+                  sx={{
+                    fontSize: 13,
+                    color: sc.dot,
+                    animation: 'wsSpin 1s linear infinite',
+                    '@keyframes wsSpin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } },
+                  }}
+                />
+              )}
+              <Typography
+                variant="caption"
+                sx={{ color: sc.color, fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap' }}
+              >
+                {sc.label}
+              </Typography>
+            </Box>
+
+            {/* Connected users avatars — unchanged */}
             <Box sx={{ display: "flex", alignItems: "center" }}>
               {connectedUsers.map((user) => (
                 <Tooltip key={user.id} title={user.name} arrow>
@@ -299,9 +340,21 @@ function App() {
         </Box>
 
         {/* Realtime Status Alert */}
-        {!isConnected && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            You are offline. Changes will not sync in real-time. Reconnecting...
+        {wsStatus === 'reconnecting' && (
+          <Alert
+            severity="warning"
+            icon={<SyncIcon sx={{ animation: 'wsSpin 1s linear infinite', '@keyframes wsSpin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } } }} />}
+            sx={{ mb: 2 }}
+          >
+            Connection lost — board data preserved.{' '}
+            {reconnectIn > 0
+              ? `Reconnecting in ${reconnectIn}s…`
+              : 'Reconnecting now…'}
+          </Alert>
+        )}
+        {wsStatus === 'connecting' && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Connecting to live server…
           </Alert>
         )}
 
