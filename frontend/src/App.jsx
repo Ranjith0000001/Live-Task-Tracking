@@ -40,7 +40,7 @@ import {
 
 import { useWebSocket } from "./hooks/useWebSocket";
 
-const API = "http://localhost:5000/api/tasks";
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api/tasks";
 
 const COLUMNS = [
   { id: "todo",       title: "To Do",       color: "#f59e0b", gradient: "linear-gradient(135deg,#f59e0b,#f97316)", light: "#fff8ed" },

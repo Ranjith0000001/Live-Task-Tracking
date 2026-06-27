@@ -38,7 +38,10 @@ A real-time collaborative Kanban Task Board built with a modern web stack. It su
 - **PostgreSQL**: A running local or cloud instance (e.g., Neon)
 
 ### 1. Environment Variables Configuration
-Navigate to the `backend/` directory, create a `.env` file (copied from `.env.example`), and fill in your details:
+Configure environment variables for both the backend and frontend:
+
+**Backend Setup:**
+Create a `.env` file in the `backend/` directory:
 ```bash
 # In backend/ directory
 cp .env.example .env
@@ -48,6 +51,19 @@ Inside the `backend/.env` file:
 DATABASE_URL="postgresql://username:password@localhost:5432/databasename?schema=public"
 PORT=5000
 ```
+
+**Frontend Setup:**
+Create a `.env` file in the `frontend/` directory to configure connection endpoints:
+```bash
+# In frontend/ directory
+cp .env.example .env
+```
+Inside the `frontend/.env` file:
+```env
+VITE_API_URL="http://localhost:5000/api/tasks"
+VITE_WS_URL="ws://localhost:5000/ws"
+```
+
 
 ### 2. Database Migrations
 Run the migrations to setup the tables in your PostgreSQL database:
