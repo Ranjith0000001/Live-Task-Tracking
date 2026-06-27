@@ -1,16 +1,13 @@
-// frontend/src/hooks/useWebSocket.js
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 const WS_URL = 'ws://localhost:5000/ws';
 
-// Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
 const getBackoffDelay = (attempt) => Math.min(1000 * Math.pow(2, attempt), 30000);
 
 export function useWebSocket() {
     const [isConnected, setIsConnected] = useState(false);
-    const [wsStatus, setWsStatus] = useState('connecting'); // 'connecting' | 'reconnecting' | 'connected'
-    const [reconnectIn, setReconnectIn] = useState(0);      // seconds until next attempt
+    const [wsStatus, setWsStatus] = useState('connecting'); 
+    const [reconnectIn, setReconnectIn] = useState(0);     
     const [lastMessage, setLastMessage] = useState(null);
     const [boardState, setBoardState] = useState({ todo: [], inprogress: [], done: [] });
     const [connectedUsers, setConnectedUsers] = useState([]);
@@ -18,10 +15,9 @@ export function useWebSocket() {
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
     const countdownIntervalRef = useRef(null);
-    const attemptRef = useRef(0);       // how many consecutive failures
+    const attemptRef = useRef(0);      
     const isFirstConnectRef = useRef(true);
 
-    // Clear any pending reconnect timers
     const clearTimers = () => {
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
@@ -33,7 +29,6 @@ export function useWebSocket() {
         }
     };
 
-    // Start a visible countdown then fire connect()
     const scheduleReconnect = useCallback((connectFn) => {
         clearTimers();
 
@@ -41,9 +36,7 @@ export function useWebSocket() {
         const seconds = Math.round(delay / 1000);
         setReconnectIn(seconds);
 
-        console.log(`🔁 Reconnecting in ${seconds}s (attempt ${attemptRef.current + 1})`);
 
-        // Tick countdown every second
         countdownIntervalRef.current = setInterval(() => {
             setReconnectIn(prev => {
                 if (prev <= 1) {
@@ -55,7 +48,6 @@ export function useWebSocket() {
             });
         }, 1000);
 
-        // Fire reconnect after full delay
         reconnectTimeoutRef.current = setTimeout(() => {
             clearTimers();
             attemptRef.current += 1;
@@ -64,7 +56,6 @@ export function useWebSocket() {
     }, []);
 
     const connect = useCallback(() => {
-        // Don't stack connections
         if (wsRef.current?.readyState === WebSocket.OPEN ||
             wsRef.current?.readyState === WebSocket.CONNECTING) {
             return;
@@ -72,15 +63,13 @@ export function useWebSocket() {
 
         const isRetry = !isFirstConnectRef.current;
         setWsStatus(isRetry ? 'reconnecting' : 'connecting');
-        console.log(isRetry ? '🔄 Reconnecting to WebSocket...' : '🔄 Connecting to WebSocket...');
 
         const ws = new WebSocket(WS_URL);
         wsRef.current = ws;
 
         ws.onopen = () => {
-            console.log('✅ WebSocket connected');
             isFirstConnectRef.current = false;
-            attemptRef.current = 0;     // reset backoff on success
+            attemptRef.current = 0;    
             setReconnectIn(0);
             setIsConnected(true);
             setWsStatus('connected');
@@ -89,11 +78,9 @@ export function useWebSocket() {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                console.log('📨 Received:', data);
                 setLastMessage(data);
 
                 switch (data.type) {
-                    // INITIAL_STATE is sent on every (re)connection — this is the re-sync
                     case 'INITIAL_STATE':
                         setBoardState(data.payload);
                         break;
@@ -117,12 +104,10 @@ export function useWebSocket() {
                             const task = data.payload.task;
                             const changedStatus = (data.payload.changes && data.payload.changes.status) || task.status;
 
-                            // Remove this task from every column
                             Object.keys(newState).forEach(key => {
                                 newState[key] = newState[key].filter(t => t.id !== task.id);
                             });
 
-                            // Add it to the correct target column
                             if (!newState[changedStatus]) {
                                 newState[changedStatus] = [];
                             }
@@ -147,7 +132,6 @@ export function useWebSocket() {
                         setBoardState(prev => {
                             const { columnId, orderedIds } = data.payload;
                             const column = prev[columnId] || [];
-                            // Re-sort existing tasks to match the server's authoritative order
                             const sorted = orderedIds
                                 .map(id => column.find(t => t.id === id))
                                 .filter(Boolean);
@@ -164,7 +148,6 @@ export function useWebSocket() {
         };
 
         ws.onclose = () => {
-            console.log('❌ WebSocket disconnected');
             setIsConnected(false);
             setWsStatus('reconnecting');
             scheduleReconnect(connect);
@@ -172,12 +155,11 @@ export function useWebSocket() {
 
         ws.onerror = (error) => {
             console.error('WebSocket error:', error);
-            ws.close(); // triggers onclose → scheduleReconnect
+            ws.close(); 
         };
 
     }, [scheduleReconnect]);
 
-    // Send message to server
     const sendMessage = useCallback((data) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify(data));
@@ -187,25 +169,24 @@ export function useWebSocket() {
         return false;
     }, []);
 
-    // Connect on mount, full cleanup on unmount
     useEffect(() => {
         connect();
 
         return () => {
             clearTimers();
             if (wsRef.current) {
-                wsRef.current.onclose = null; // prevent reconnect loop on intentional unmount
+                wsRef.current.onclose = null; 
                 wsRef.current.close();
             }
         };
     }, [connect]);
 
     return {
-        isConnected,          // boolean — existing consumers unchanged
-        wsStatus,             // 'connecting' | 'reconnecting' | 'connected'
-        reconnectIn,          // seconds until next attempt (for the countdown UI)
+        isConnected,         
+        wsStatus,            
+        reconnectIn,          
         boardState,
-        setBoardState,        // Allow manual state updates
+        setBoardState,        
         lastMessage,
         sendMessage,
         connectedUsers,

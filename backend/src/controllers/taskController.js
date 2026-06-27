@@ -103,7 +103,6 @@ const deleteTask = async (req, res) => {
     }
 };
 
-// Reorder tasks within a column and broadcast the new order live
 const reorderTasks = async (req, res) => {
     try {
         const { columnId, orderedIds } = req.body;
@@ -116,12 +115,10 @@ const reorderTasks = async (req, res) => {
 
         const updatedTasks = await taskService.reorderTasks(orderedIds);
 
-        // Refresh board state cache
         const allTasks = await taskService.getAllTasks();
         const groupedTasks = groupTasksByStatus(allTasks);
         updateCurrentState(groupedTasks);
 
-        // Broadcast new column order to all connected clients
         broadcastUpdate({
             type: 'TASK_REORDERED',
             payload: { columnId, orderedIds },

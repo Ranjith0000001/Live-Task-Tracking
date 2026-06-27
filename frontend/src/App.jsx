@@ -21,6 +21,8 @@ import {
   Avatar,
   Badge,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -36,18 +38,20 @@ import {
   Schedule as ScheduleIcon,
 } from "@mui/icons-material";
 
-import { useWebSocket } from "./hooks/useWebSocket"; // ADD THIS
+import { useWebSocket } from "./hooks/useWebSocket";
 
 const API = "http://localhost:5000/api/tasks";
 
 const COLUMNS = [
-  { id: "todo", title: "To Do", color: "#ff9800" },
-  { id: "inprogress", title: "In Progress", color: "#2196f3" },
-  { id: "done", title: "Done", color: "#4caf50" },
+  { id: "todo",       title: "To Do",       color: "#f59e0b", gradient: "linear-gradient(135deg,#f59e0b,#f97316)", light: "#fff8ed" },
+  { id: "inprogress", title: "In Progress",  color: "#3b82f6", gradient: "linear-gradient(135deg,#3b82f6,#6366f1)", light: "#eff6ff" },
+  { id: "done",       title: "Done",         color: "#22c55e", gradient: "linear-gradient(135deg,#22c55e,#10b981)", light: "#f0fdf4" },
 ];
 
 function App() {
-  // Use WebSocket hook
+  const theme = useTheme();
+  const fullScreenDialog = useMediaQuery(theme.breakpoints.down("sm"));
+
   const {
     isConnected,
     wsStatus,
@@ -57,14 +61,12 @@ function App() {
     connectedUsers = []
   } = useWebSocket();
 
-  // Local state
   const [tasks, setTasks] = useState({ todo: [], inprogress: [], done: [] });
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editText, setEditText] = useState("");
   const [dragTask, setDragTask] = useState(null);
-  // { columnId, index } — tracks which slot the dragged card is hovering over
   const [dragOverInfo, setDragOverInfo] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -73,14 +75,12 @@ function App() {
   const [newDeadline, setNewDeadline] = useState("");
   const [newEffortHrs, setNewEffortHrs] = useState("");
 
-  // Sync WebSocket board state with local state (after initial load, this keeps tasks in sync)
   useEffect(() => {
     if (Object.keys(wsBoardState).length > 0) {
       setTasks(wsBoardState);
     }
   }, [wsBoardState]);
 
-  // Fetch tasks from API (initial load)
   const fetchTasks = async () => {
     try {
       const { data } = await axios.get(API);
@@ -91,7 +91,7 @@ function App() {
         }
       });
       setTasks(grouped);
-      setWsBoardState(grouped); // Update WebSocket state
+      setWsBoardState(grouped); 
     } catch (err) {
       console.error("Error fetching tasks:", err);
       showSnackbar("Error fetching tasks", "error");
@@ -102,12 +102,10 @@ function App() {
     fetchTasks();
   }, []);
 
-  // Show notification
   const showSnackbar = (message, severity = "success") => {
     setSnackbar({ open: true, message, severity });
   };
 
-  // Create task
   const handleAddTask = async () => {
     if (!newTitle.trim()) return;
     try {
@@ -129,7 +127,6 @@ function App() {
     }
   };
 
-  // Delete task
   const handleDeleteTask = async () => {
     if (!selectedTask) return;
     try {
@@ -143,7 +140,6 @@ function App() {
     }
   };
 
-  // Move task (status update)
   const handleMoveTask = async (direction) => {
     if (!selectedTask) return;
     const columnOrder = ["todo", "inprogress", "done"];
@@ -164,7 +160,6 @@ function App() {
     }
   };
 
-  // Edit task
   const handleOpenEdit = () => {
     if (!selectedTask) return;
     setEditText(selectedTask.title);
@@ -187,18 +182,15 @@ function App() {
     }
   };
 
-  // ── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDragStart = (task) => {
     setDragTask(task);
   };
 
-  // Called on the column container — for inter-column drops only
   const handleDragOver = (e, columnId) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
 
-  // Called on each task card during hover — tracks insertion index
   const handleCardDragEnter = (e, columnId, index) => {
     e.preventDefault();
     e.stopPropagation();
@@ -217,7 +209,6 @@ function App() {
     const isSameColumn = dragTask.status === targetStatus;
 
     if (isSameColumn) {
-      // ── Intra-column reorder ──
       const column = tasks[targetStatus];
       const fromIndex = column.findIndex(t => t.id === dragTask.id);
       const toIndex   = dragOverInfo?.columnId === targetStatus ? dragOverInfo.index : column.length - 1;
@@ -226,7 +217,6 @@ function App() {
         setDragTask(null); setDragOverInfo(null); return;
       }
 
-      // Optimistic UI update
       const reordered = [...column];
       const [moved] = reordered.splice(fromIndex, 1);
       const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
@@ -243,11 +233,9 @@ function App() {
       } catch (err) {
         console.error("Error reordering:", err);
         showSnackbar("Error saving order", "error");
-        // Revert on failure
         setTasks(prev => ({ ...prev, [targetStatus]: column }));
       }
     } else {
-      // ── Inter-column move (existing behaviour unchanged) ──
       setDragTask(null); setDragOverInfo(null);
       try {
         await axios.put(`${API}/${dragTask.id}`, { status: targetStatus });
@@ -265,7 +253,6 @@ function App() {
 
 
 
-  // Menu handlers
   const handleMenuOpen = (event, task) => {
     setAnchorEl(event.currentTarget);
     setSelectedTask(task);
@@ -280,7 +267,6 @@ function App() {
     if (e.key === "Enter") handleAddTask();
   };
 
-  // 3-state status config
   const statusConfig = {
     connected:    { label: 'Live',         color: '#2e7d32', bg: '#e8f5e9', dot: '#4caf50', icon: WifiIcon },
     reconnecting: { label: reconnectIn > 0 ? `Reconnecting ${reconnectIn}s` : 'Reconnecting…', color: '#7c4f00', bg: '#fff8e1', dot: '#ff9800', icon: SyncIcon },
@@ -288,193 +274,221 @@ function App() {
   };
   const sc = statusConfig[wsStatus] || statusConfig.connecting;
 
-  return (
-    <Box sx={{ bgcolor: "#f5f5f5", minHeight: "100vh", py: 4 }}>
-      <Container maxWidth="lg">
-        {/* Header with Connection Status */}
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{ fontWeight: 700, color: "#333" }}
-          >
-            Task Board
-          </Typography>
-          
-          {/* Connection Status Badge */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+  const dialogFieldSx = {
+    "& .MuiOutlinedInput-root": {
+      color: "#1e293b",
+      borderRadius: 2,
+      "& fieldset": { borderColor: "rgba(0,0,0,0.15)" },
+      "&:hover fieldset": { borderColor: "#6366f1" },
+      "&.Mui-focused fieldset": { borderColor: "#6366f1" },
+    },
+    "& .MuiInputLabel-root": { color: "#64748b" },
+    "& .MuiInputLabel-root.Mui-focused": { color: "#6366f1" },
+    "& input": { color: "#1e293b" },
+    "& input::placeholder": { color: "#94a3b8", opacity: 1 },
+  };
 
-            {/* 3-state animated pill */}
-            <Box
+  return (
+    <Box sx={{
+      minHeight: "100vh",
+      background: "linear-gradient(160deg, #eef2ff 0%, #f8fafc 45%, #fdf4ff 100%)",
+      py: { xs: 2, sm: 3, md: 4 },
+    }}>
+      <Container maxWidth="lg" sx={{ px: { xs: 1.5, sm: 2, md: 3 } }}>
+
+        <Box sx={{
+          display: "flex",
+          alignItems: { xs: "flex-start", sm: "center" },
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 1.5,
+          mb: { xs: 2.5, sm: 3.5 },
+          px: { xs: 1, sm: 2 },
+          py: { xs: 1.5, sm: 2 },
+          borderRadius: 3,
+          background: "rgba(255,255,255,0.85)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid rgba(99,102,241,0.12)",
+          boxShadow: "0 4px 24px rgba(99,102,241,0.10)",
+        }}>
+          {/* Title + subtitle */}
+          <Box>
+            <Typography
+              variant="h4"
+              component="h1"
               sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 0.75,
-                px: 1.25,
-                py: 0.4,
-                borderRadius: 99,
-                bgcolor: sc.bg,
-                border: `1px solid ${sc.dot}44`,
-                transition: 'all 0.4s ease',
+                fontWeight: 800,
+                fontSize: { xs: "1.4rem", sm: "1.75rem", md: "2rem" },
+                background: "linear-gradient(90deg,#4f46e5,#7c3aed)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                letterSpacing: "-0.5px",
               }}
             >
-              {/* Animated dot */}
-              <Box
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  bgcolor: sc.dot,
-                  flexShrink: 0,
-                  ...(wsStatus !== 'connected' && {
-                    animation: 'wsPulse 1.2s ease-in-out infinite',
-                    '@keyframes wsPulse': {
-                      '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-                      '50%':       { opacity: 0.35, transform: 'scale(0.75)' },
-                    },
-                  }),
-                }}
-              />
-              {/* Spinning icon while not connected */}
-              {wsStatus !== 'connected' && (
-                <SyncIcon
-                  sx={{
-                    fontSize: 13,
-                    color: sc.dot,
-                    animation: 'wsSpin 1s linear infinite',
-                    '@keyframes wsSpin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } },
-                  }}
-                />
+              Task Board
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 500 }}>
+              {Object.values(tasks).flat().length} tasks across {COLUMNS.length} columns
+            </Typography>
+          </Box>
+
+          {/* Right side: status pill + avatars + add button */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1, sm: 1.5 }, flexWrap: "wrap" }}>
+
+            {/* 3-state animated pill */}
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 0.75,
+              px: 1.5, py: 0.5, borderRadius: 99,
+              bgcolor: sc.bg, border: `1px solid ${sc.dot}55`,
+              boxShadow: `0 0 12px ${sc.dot}33`,
+              transition: "all 0.4s ease",
+            }}>
+              <Box sx={{
+                width: 7, height: 7, borderRadius: "50%", bgcolor: sc.dot, flexShrink: 0,
+                ...(wsStatus !== "connected" && {
+                  animation: "wsPulse 1.2s ease-in-out infinite",
+                  "@keyframes wsPulse": {
+                    "0%,100%": { opacity: 1, transform: "scale(1)" },
+                    "50%":     { opacity: 0.35, transform: "scale(0.7)" },
+                  },
+                }),
+              }} />
+              {wsStatus !== "connected" && (
+                <SyncIcon sx={{
+                  fontSize: 12, color: sc.dot,
+                  animation: "wsSpin 1s linear infinite",
+                  "@keyframes wsSpin": { from: { transform: "rotate(0deg)" }, to: { transform: "rotate(360deg)" } },
+                }} />
               )}
-              <Typography
-                variant="caption"
-                sx={{ color: sc.color, fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap' }}
-              >
+              <Typography variant="caption" sx={{ color: sc.color, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap" }}>
                 {sc.label}
               </Typography>
             </Box>
 
-            {/* Connected users avatars — unchanged */}
+            {/* Connected user avatars */}
             <Box sx={{ display: "flex", alignItems: "center" }}>
               {connectedUsers.map((user) => (
                 <Tooltip key={user.id} title={user.name} arrow>
-                  <Avatar
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      fontSize: 12,
-                      bgcolor: user.color,
-                      border: "2px solid #fff",
-                      ml: -1,
-                    }}
-                  >
-                    {user.name?.[0] || '?'}
+                  <Avatar sx={{
+                    width: 30, height: 30, fontSize: 12,
+                    bgcolor: user.color,
+                    border: "2px solid rgba(255,255,255,0.2)",
+                    ml: -0.75,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                  }}>
+                    {user.name?.[0] || "?"}
                   </Avatar>
                 </Tooltip>
               ))}
             </Box>
+
+            {/* Add Task Button */}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setAddDialogOpen(true)}
+              disabled={!isConnected}
+              sx={{
+                borderRadius: 99,
+                px: { xs: 2, sm: 2.5 },
+                py: 0.85,
+                fontWeight: 700,
+                fontSize: "0.82rem",
+                textTransform: "none",
+                background: isConnected
+                  ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+                  : undefined,
+                boxShadow: isConnected
+                  ? "0 4px 20px rgba(99,102,241,0.5)"
+                  : undefined,
+                "&:hover": {
+                  background: "linear-gradient(135deg,#4f46e5,#7c3aed)",
+                  boxShadow: "0 6px 24px rgba(99,102,241,0.6)",
+                  transform: "translateY(-1px)",
+                },
+                transition: "all 0.2s ease",
+                width: { xs: "100%", sm: "auto" },
+              }}
+            >
+              New Task
+            </Button>
           </Box>
         </Box>
 
-        {/* Add Task Button */}
-        <Box sx={{ mb: 3, display: "flex", justifyContent: "flex-end" }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setAddDialogOpen(true)}
-            disabled={!isConnected}
-            sx={{ borderRadius: 2, px: 3, py: 1 }}
-          >
-            Add Task
-          </Button>
-        </Box>
-
         {/* Realtime Status Alert */}
-        {wsStatus === 'reconnecting' && (
+        {wsStatus === "reconnecting" && (
           <Alert
             severity="warning"
-            icon={<SyncIcon sx={{ animation: 'wsSpin 1s linear infinite', '@keyframes wsSpin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } } }} />}
-            sx={{ mb: 2 }}
+            icon={<SyncIcon sx={{ animation: "wsSpin 1s linear infinite", "@keyframes wsSpin": { from: { transform: "rotate(0deg)" }, to: { transform: "rotate(360deg)" } } }} />}
+            sx={{ mb: 2, borderRadius: 2, backdropFilter: "blur(8px)", bgcolor: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24" }}
           >
-            Connection lost — board data preserved.{' '}
-            {reconnectIn > 0
-              ? `Reconnecting in ${reconnectIn}s…`
-              : 'Reconnecting now…'}
+            Connection lost — board data preserved.{" "}
+            {reconnectIn > 0 ? `Reconnecting in ${reconnectIn}s…` : "Reconnecting now…"}
           </Alert>
         )}
-        {wsStatus === 'connecting' && (
-          <Alert severity="info" sx={{ mb: 2 }}>
+        {wsStatus === "connecting" && (
+          <Alert severity="info" sx={{ mb: 2, borderRadius: 2, backdropFilter: "blur(8px)", bgcolor: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", color: "#93c5fd" }}>
             Connecting to live server…
           </Alert>
         )}
 
         {/* Kanban Columns */}
-        <Grid container spacing={2}>
+        <Grid container spacing={{ xs: 1.5, sm: 2 }}>
           {COLUMNS.map((column) => (
-            <Grid item xs={12} md={4} key={column.id}>
+            <Grid item xs={12} sm={6} md={4} key={column.id}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  border: "1px solid #e0e0e0",
-                  minHeight: 300,
+                  p: { xs: 1.5, sm: 2 },
+                  borderRadius: { xs: 2, sm: 3 },
+                  background: dragTask && dragTask.status !== column.id
+                    ? `${column.light}`
+                    : "#ffffff",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  borderTop: `3px solid ${column.color}`,
+                  boxShadow: dragTask && dragTask.status !== column.id
+                    ? `0 0 0 2px ${column.color}44, 0 8px 32px rgba(0,0,0,0.08)`
+                    : "0 2px 16px rgba(0,0,0,0.07)",
+                  minHeight: { xs: 180, sm: 250, md: 320 },
                   display: "flex",
                   flexDirection: "column",
-                  bgcolor:
-                    dragTask && dragTask.status !== column.id
-                      ? "#f0f8ff"
-                      : "transparent",
-                  transition: "background-color 0.2s",
+                  transition: "all 0.25s ease",
                 }}
                 onDragOver={(e) => handleDragOver(e, column.id)}
                 onDrop={(e) => handleDrop(e, column.id)}
               >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    mb: 2,
-                    pb: 2,
-                    borderBottom: `3px solid ${column.color}`,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      bgcolor: column.color,
-                    }}
-                  />
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 600, flex: 1 }}
-                  >
+                {/* Column header */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2, pb: 1.5, borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+                  <Box sx={{
+                    width: 10, height: 10, borderRadius: "50%",
+                    background: column.gradient,
+                    boxShadow: `0 0 8px ${column.color}99`,
+                  }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700, flex: 1, color: "#1e293b", fontSize: { xs: "0.95rem", sm: "1.05rem" } }}>
                     {column.title}
                   </Typography>
                   <Chip
                     label={tasks[column.id]?.length || 0}
                     size="small"
                     sx={{
-                      bgcolor: column.color,
+                      background: column.gradient,
                       color: "#fff",
-                      fontWeight: 600,
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      height: 22,
+                      boxShadow: `0 2px 8px ${column.color}55`,
                     }}
                   />
                 </Box>
 
                 <Box sx={{ flex: 1 }}>
                   {tasks[column.id]?.length === 0 ? (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      align="center"
-                      sx={{ mt: 4 }}
-                    >
-                      No tasks
-                    </Typography>
+                    <Box sx={{ textAlign: "center", mt: 4, opacity: 0.45 }}>
+                      <Box sx={{ fontSize: 32, mb: 1 }}>📋</Box>
+                      <Typography variant="body2" sx={{ color: "#64748b", fontWeight: 500 }}>
+                        No tasks yet
+                      </Typography>
+                    </Box>
                   ) : (
                     tasks[column.id]?.map((task, index) => (
                       <Box key={task.id}>
@@ -496,74 +510,90 @@ function App() {
                             />
                           )}
                         <Paper
-                          elevation={1}
+                          elevation={0}
                           draggable={isConnected}
                           onDragStart={() => handleDragStart(task)}
                           onDragEnd={handleDragEnd}
                           onDragEnter={(e) => handleCardDragEnter(e, column.id, index)}
                           onDragOver={handleCardDragOver}
                           sx={{
-                            p: 1.5,
-                            mb: 1.5,
-                            borderRadius: 2,
+                            p: { xs: 1.25, sm: 1.5 },
+                            mb: { xs: 1, sm: 1.25 },
+                            borderRadius: 2.5,
                             display: "flex",
-                            alignItems: "center",
+                            alignItems: "flex-start",
                             gap: 1,
                             cursor: isConnected ? "grab" : "default",
-                            transition: "all 0.2s",
-                            "&:hover": {
-                              boxShadow: isConnected ? 3 : 1,
-                              transform: isConnected ? "translateY(-1px)" : "none",
-                            },
-                            opacity: dragTask?.id === task.id ? 0.4 : 1,
-                            borderLeft: `4px solid ${column.color}`,
+                            transition: "all 0.22s ease",
+                            background: "#ffffff",
+                            border: "1px solid rgba(0,0,0,0.07)",
+                            borderLeft: `3px solid ${column.color}`,
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                            "&:hover": isConnected ? {
+                              background: column.light,
+                              boxShadow: `0 6px 20px rgba(0,0,0,0.10), 0 0 0 1px ${column.color}33`,
+                              transform: "translateY(-2px)",
+                            } : {},
+                            opacity: dragTask?.id === task.id ? 0.35 : 1,
                           }}
                         >
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight: 500,
+                          {/* Colored initial avatar */}
+                          {task.assignee && (
+                            <Avatar sx={{
+                              width: 28, height: 28, fontSize: 11, fontWeight: 700, flexShrink: 0, mt: 0.2,
+                              background: column.gradient,
+                              boxShadow: `0 2px 8px ${column.color}66`,
+                            }}>
+                              {task.assignee[0].toUpperCase()}
+                            </Avatar>
+                          )}
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{
+                              fontWeight: 600,
                               wordBreak: "break-word",
-                              mb: 0.5,
-                            }}
-                          >
-                            {task.title}
-                          </Typography>
-                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
-                            {task.assignee && (
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                <PersonIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-                                <Typography variant="caption" color="text.secondary">
-                                  {task.assignee}
-                                </Typography>
-                              </Box>
-                            )}
-                            {task.deadline && (
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                <CalendarIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-                                <Typography variant="caption" color="text.secondary">
-                                  {new Date(task.deadline).toLocaleDateString()}
-                                </Typography>
-                              </Box>
-                            )}
-                            {task.effortHrs && (
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                <TimeIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-                                <Typography variant="caption" color="text.secondary">
-                                  {task.effortHrs}h
-                                </Typography>
-                              </Box>
-                            )}
+                              mb: 0.75,
+                              color: "#1e293b",
+                              fontSize: { xs: "0.8rem", sm: "0.85rem" },
+                              lineHeight: 1.4,
+                            }}>
+                              {task.title}
+                            </Typography>
+                            {/* Metadata chips row */}
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                              {task.assignee && (
+                                <Chip
+                                  icon={<PersonIcon style={{ fontSize: 11, color: "#94a3b8" }} />}
+                                  label={task.assignee}
+                                  size="small"
+                                  sx={{ height: 18, fontSize: "0.68rem", bgcolor: "rgba(99,102,241,0.08)", color: "#64748b", border: "1px solid rgba(99,102,241,0.12)", "& .MuiChip-icon": { ml: 0.5 } }}
+                                />
+                              )}
+                              {task.deadline && (
+                                <Chip
+                                  icon={<CalendarIcon style={{ fontSize: 11, color: "#94a3b8" }} />}
+                                  label={new Date(task.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                                  size="small"
+                                  sx={{ height: 18, fontSize: "0.68rem", bgcolor: "rgba(99,102,241,0.08)", color: "#64748b", border: "1px solid rgba(99,102,241,0.12)", "& .MuiChip-icon": { ml: 0.5 } }}
+                                />
+                              )}
+                              {task.effortHrs && (
+                                <Chip
+                                  icon={<TimeIcon style={{ fontSize: 11, color: "#94a3b8" }} />}
+                                  label={`${task.effortHrs}h`}
+                                  size="small"
+                                  sx={{ height: 18, fontSize: "0.68rem", bgcolor: "rgba(99,102,241,0.08)", color: "#64748b", border: "1px solid rgba(99,102,241,0.12)", "& .MuiChip-icon": { ml: 0.5 } }}
+                                />
+                              )}
+                            </Box>
                           </Box>
-                        </Box>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, task)}
-                          disabled={!isConnected}
-                        >
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, task)}
+                            disabled={!isConnected}
+                            sx={{ color: "#94a3b8", "&:hover": { color: "#4f46e5", bgcolor: "rgba(99,102,241,0.08)" }, flexShrink: 0 }}
+                          >
+                            <MoreVertIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
                         </Paper>
                       </Box>
                     ))
@@ -579,38 +609,45 @@ function App() {
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
           onClose={handleMenuClose}
+          PaperProps={{
+            sx: {
+              borderRadius: 2.5,
+              background: "#ffffff",
+              border: "1px solid rgba(0,0,0,0.08)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+              minWidth: 180,
+              "& .MuiMenuItem-root": {
+                fontSize: "0.85rem",
+                fontWeight: 500,
+                color: "#334155",
+                borderRadius: 1.5,
+                mx: 0.5,
+                my: 0.25,
+                "&:hover": { bgcolor: "#f1f5ff", color: "#4f46e5" },
+              },
+            },
+          }}
         >
           <MenuItem onClick={handleOpenEdit}>
-            <EditIcon fontSize="small" sx={{ mr: 1 }} />
-            Edit
+            <EditIcon fontSize="small" sx={{ mr: 1.5, color: "#6366f1" }} />
+            Edit Task
           </MenuItem>
           {selectedTask && selectedTask.status !== "todo" && (
             <MenuItem onClick={() => handleMoveTask(-1)}>
-              ← Move to{" "}
-              {COLUMNS[
-                COLUMNS.findIndex(
-                  (c) => c.id === selectedTask.status
-                ) - 1
-              ]?.title || "Previous"}
+              <Box component="span" sx={{ mr: 1.5, fontSize: 14 }}>←</Box>
+              Move to {COLUMNS[COLUMNS.findIndex((c) => c.id === selectedTask.status) - 1]?.title || "Previous"}
             </MenuItem>
           )}
           {selectedTask && selectedTask.status !== "done" && (
             <MenuItem onClick={() => handleMoveTask(1)}>
-              Move to{" "}
-              {COLUMNS[
-                COLUMNS.findIndex(
-                  (c) => c.id === selectedTask.status
-                ) + 1
-              ]?.title || "Next"}{" "}
-              →
+              <Box component="span" sx={{ mr: 1.5, fontSize: 14 }}>→</Box>
+              Move to {COLUMNS[COLUMNS.findIndex((c) => c.id === selectedTask.status) + 1]?.title || "Next"}
             </MenuItem>
           )}
-          <MenuItem
-            onClick={handleDeleteTask}
-            sx={{ color: "error.main" }}
-          >
-            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-            Delete
+          <Box sx={{ height: 1, bgcolor: "rgba(0,0,0,0.07)", mx: 1, my: 0.5 }} />
+          <MenuItem onClick={handleDeleteTask} sx={{ color: "#ef4444 !important" }}>
+            <DeleteIcon fontSize="small" sx={{ mr: 1.5, color: "#ef4444" }} />
+            Delete Task
           </MenuItem>
         </Menu>
 
@@ -620,67 +657,80 @@ function App() {
           onClose={() => setAddDialogOpen(false)}
           maxWidth="sm"
           fullWidth
+          fullScreen={fullScreenDialog}
+          PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 }, background: "#ffffff", border: "1px solid rgba(0,0,0,0.08)", boxShadow: "0 24px 64px rgba(99,102,241,0.15)" } }}
         >
-          <DialogTitle>Create New Task</DialogTitle>
-          <DialogContent>
+          {/* Dialog color header strip */}
+          <Box sx={{ height: 4, background: "linear-gradient(90deg,#6366f1,#8b5cf6,#ec4899)", borderRadius: { xs: 0, sm: "12px 12px 0 0" } }} />
+          <DialogTitle sx={{ color: "#1e293b", fontWeight: 700, pb: 0.5, pt: 2 }}>
+            ✦ Create New Task
+          </DialogTitle>
+          <DialogContent sx={{ pt: 1.5 }}>
             <TextField
               autoFocus
               fullWidth
               margin="dense"
-              label="Title *"
+              label="Task Title"
+              placeholder="What needs to be done?"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               variant="outlined"
+              sx={dialogFieldSx}
             />
             <TextField
               fullWidth
               margin="dense"
-              label="Assignee *"
+              label="Assignee"
+              placeholder="Who owns this?"
               value={newAssignee}
               onChange={(e) => setNewAssignee(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <PersonIcon sx={{ mr: 1, color: "text.secondary" }} />
-                ),
-              }}
+              InputProps={{ startAdornment: <PersonIcon sx={{ mr: 1, color: "#6366f1", fontSize: 18 }} /> }}
               variant="outlined"
+              sx={dialogFieldSx}
             />
             <TextField
               fullWidth
               margin="dense"
-              label="Deadline *"
+              label="Deadline"
               type="date"
               value={newDeadline}
               onChange={(e) => setNewDeadline(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <CalendarIcon sx={{ mr: 1, color: "text.secondary" }} />
-                ),
-              }}
+              InputProps={{ startAdornment: <CalendarIcon sx={{ mr: 1, color: "#6366f1", fontSize: 18 }} /> }}
               InputLabelProps={{ shrink: true }}
               variant="outlined"
+              sx={dialogFieldSx}
             />
             <TextField
               fullWidth
               margin="dense"
-              label="Effort Hours *"
+              label="Effort Hours"
               type="number"
+              placeholder="e.g. 4"
               value={newEffortHrs}
               onChange={(e) => setNewEffortHrs(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <TimeIcon sx={{ mr: 1, color: "text.secondary" }} />
-                ),
-              }}
+              InputProps={{ startAdornment: <TimeIcon sx={{ mr: 1, color: "#6366f1", fontSize: 18 }} /> }}
               variant="outlined"
+              sx={dialogFieldSx}
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+          <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+            <Button
+              onClick={() => setAddDialogOpen(false)}
+              sx={{ color: "#64748b", borderRadius: 2, textTransform: "none", fontWeight: 600, "&:hover": { bgcolor: "#f1f5ff" } }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleAddTask}
               variant="contained"
               disabled={!newTitle.trim() || !newAssignee.trim() || !newDeadline || !newEffortHrs}
+              sx={{
+                borderRadius: 2, textTransform: "none", fontWeight: 700, px: 3,
+                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                boxShadow: "0 4px 16px rgba(99,102,241,0.4)",
+                "&:hover": { background: "linear-gradient(135deg,#4f46e5,#7c3aed)" },
+                "&:disabled": { opacity: 0.4 },
+              }}
             >
               Create Task
             </Button>
@@ -693,9 +743,12 @@ function App() {
           onClose={() => setEditDialogOpen(false)}
           maxWidth="sm"
           fullWidth
+          fullScreen={fullScreenDialog}
+          PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 }, background: "#ffffff", border: "1px solid rgba(0,0,0,0.08)", boxShadow: "0 24px 64px rgba(59,130,246,0.12)" } }}
         >
-          <DialogTitle>Edit Task</DialogTitle>
-          <DialogContent>
+          <Box sx={{ height: 4, background: "linear-gradient(90deg,#3b82f6,#6366f1)", borderRadius: { xs: 0, sm: "12px 12px 0 0" } }} />
+          <DialogTitle sx={{ color: "#1e293b", fontWeight: 700, pb: 0.5, pt: 2 }}>✎ Edit Task</DialogTitle>
+          <DialogContent sx={{ pt: 1.5 }}>
             <TextField
               autoFocus
               fullWidth
@@ -703,22 +756,31 @@ function App() {
               label="Task Title"
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") handleSaveEdit();
-              }}
+              onKeyPress={(e) => { if (e.key === "Enter") handleSaveEdit(); }}
               variant="outlined"
+              sx={dialogFieldSx}
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setEditDialogOpen(false)}>
+          <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+            <Button
+              onClick={() => setEditDialogOpen(false)}
+              sx={{ color: "#64748b", borderRadius: 2, textTransform: "none", fontWeight: 600, "&:hover": { bgcolor: "#f1f5ff" } }}
+            >
               Cancel
             </Button>
             <Button
               onClick={handleSaveEdit}
               variant="contained"
               disabled={!editText.trim()}
+              sx={{
+                borderRadius: 2, textTransform: "none", fontWeight: 700, px: 3,
+                background: "linear-gradient(135deg,#3b82f6,#6366f1)",
+                boxShadow: "0 4px 16px rgba(59,130,246,0.4)",
+                "&:hover": { background: "linear-gradient(135deg,#2563eb,#4f46e5)" },
+                "&:disabled": { opacity: 0.4 },
+              }}
             >
-              Save
+              Save Changes
             </Button>
           </DialogActions>
         </Dialog>
@@ -728,12 +790,22 @@ function App() {
           open={snackbar.open}
           autoHideDuration={3000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
-          <Alert 
-            onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          <Alert
+            onClose={() => setSnackbar({ ...snackbar, open: false })}
             severity={snackbar.severity}
-            sx={{ width: "100%" }}
+            sx={{
+              width: "100%",
+              borderRadius: 2.5,
+              background: "#ffffff",
+              border: "1px solid rgba(0,0,0,0.08)",
+              color: "#1e293b",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+              backdropFilter: "blur(12px)",
+              fontWeight: 600,
+              "& .MuiAlert-icon": { color: snackbar.severity === "success" ? "#22c55e" : "#ef4444" },
+            }}
           >
             {snackbar.message}
           </Alert>

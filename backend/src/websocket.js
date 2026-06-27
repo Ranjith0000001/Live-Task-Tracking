@@ -25,7 +25,6 @@ function broadcastUserList() {
 function setupWebSocket(server) {
   const wss = new WebSocket.Server({ server, path: '/ws' });
 
-  console.log('WebSocket server initialized on path: /ws');
 
   wss.on('connection', (ws) => {
     const user = createUser();
@@ -41,7 +40,6 @@ function setupWebSocket(server) {
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message);
-        console.log('Received message:', data);
       } catch (error) {
         console.error('Error parsing message:', error);
       }
