@@ -1,8 +1,8 @@
-const express = require("express");
-const cors = require("cors");
-const { setupWebSocket } = require("./websocket"); 
-const http = require("http");
-const taskRoutes = require("./routes/taskRoutes");
+import express from "express";
+import cors from "cors";
+import { setupWebSocket } from "./websocket.js"; 
+import http from "http";
+import taskRoutes from "./routes/taskRoutes.js";
 
 const app = express();
 
@@ -18,4 +18,4 @@ app.get("/api/health", (req, res) => {
 const server = http.createServer(app); 
 setupWebSocket(server);
 
-module.exports = { app, server };
+export { app, server };

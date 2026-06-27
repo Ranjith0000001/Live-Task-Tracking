@@ -1,4 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
+import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const getAllTasks = async () => {
@@ -75,4 +75,4 @@ const reorderTasks = async (orderedIds) => {
     });
 };
 
-module.exports = { getAllTasks, getTaskById, createTask, updateTask, deleteTask, reorderTasks };
+export { getAllTasks, getTaskById, createTask, updateTask, deleteTask, reorderTasks };

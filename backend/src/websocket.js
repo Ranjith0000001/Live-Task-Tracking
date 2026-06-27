@@ -1,4 +1,4 @@
-const WebSocket = require('ws');
+import WebSocket, { WebSocketServer } from 'ws';
 
 const clients = new Map();
 
@@ -23,7 +23,7 @@ function broadcastUserList() {
 }
 
 function setupWebSocket(server) {
-  const wss = new WebSocket.Server({ server, path: '/ws' });
+  const wss = new WebSocketServer({ server, path: '/ws' });
 
 
   wss.on('connection', (ws) => {
@@ -78,7 +78,7 @@ function getCurrentState() {
   return currentBoardState;
 }
 
-module.exports = {
+export {
   setupWebSocket,
   broadcastUpdate,
   updateCurrentState,

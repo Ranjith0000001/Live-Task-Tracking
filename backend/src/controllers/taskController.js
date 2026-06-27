@@ -1,6 +1,6 @@
-const taskService = require("../services/taskService");
-const { broadcastUpdate, updateCurrentState } = require("../websocket");
-const { groupTasksByStatus } = require("../utils/taskUtils");
+import * as taskService from "../services/taskService.js";
+import { broadcastUpdate, updateCurrentState } from "../websocket.js";
+import { groupTasksByStatus } from "../utils/taskUtils.js";
 
 const getAllTasks = async (req, res) => {
     try {
@@ -130,4 +130,4 @@ const reorderTasks = async (req, res) => {
     }
 };
 
-module.exports = { getAllTasks, createTask, updateTask, deleteTask, reorderTasks };
+export { getAllTasks, createTask, updateTask, deleteTask, reorderTasks };

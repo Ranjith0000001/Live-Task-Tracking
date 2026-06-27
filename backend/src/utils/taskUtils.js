@@ -14,4 +14,4 @@ function groupTasksByStatus(tasks) {
     return grouped;
 }
 
-module.exports = { groupTasksByStatus };
+export { groupTasksByStatus };
