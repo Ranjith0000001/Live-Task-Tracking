@@ -33,7 +33,6 @@ import {
   CalendarToday as CalendarIcon,
   AccessTime as TimeIcon,
   Schedule as ScheduleIcon,
-  Visibility as EyeIcon,
 } from "@mui/icons-material";
 
 import { useWebSocket } from "./hooks/useWebSocket"; // ADD THIS
@@ -50,7 +49,6 @@ function App() {
   // Use WebSocket hook
   const {
     isConnected,
-    isReconnecting,
     boardState: wsBoardState,
     setBoardState: setWsBoardState,
     connectedUsers = []
@@ -229,15 +227,11 @@ function App() {
     if (e.key === "Enter") handleAddTask();
   };
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchTasks();
-    }
-  }, [isConnected]);
-const getStatusColor = () => {
-  if (isReconnecting) return "warning.main";
-  return isConnected ? "success.main" : "error.main";
-};
+  // Get connection status color
+  const getStatusColor = () => {
+    return isConnected ? "success.main" : "error.main";
+  };
+
   return (
     <Box sx={{ bgcolor: "#f5f5f5", minHeight: "100vh", py: 4 }}>
       <Container maxWidth="lg">
@@ -270,18 +264,29 @@ const getStatusColor = () => {
                 fontWeight: 500,
               }}
             />
-
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              {connectedUsers.map((user) => (
+                <Tooltip key={user.id} title={user.name} arrow>
+                  <Avatar
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      fontSize: 12,
+                      bgcolor: user.color,
+                      border: "2px solid #fff",
+                      ml: -1,
+                    }}
+                  >
+                    {user.name?.[0] || '?'}
+                  </Avatar>
+                </Tooltip>
+              ))}
+            </Box>
           </Box>
         </Box>
 
         {/* Add Task Button */}
-        <Box sx={{ mb: 3, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
-            <EyeIcon fontSize="small" />
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              {connectedUsers.length} Active
-            </Typography>
-          </Box>
+        <Box sx={{ mb: 3, display: "flex", justifyContent: "flex-end" }}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}

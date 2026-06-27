@@ -65,9 +65,9 @@ function setupWebSocket(server) {
 function broadcastUpdate(data) {
   const message = JSON.stringify(data);
 
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
+  clients.forEach((user, ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
     }
   });
 }

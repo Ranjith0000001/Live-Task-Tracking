@@ -6,32 +6,11 @@ const WS_URL = 'ws://localhost:5000/ws';
 
 export function useWebSocket() {
     const [isConnected, setIsConnected] = useState(false);
-    const [isReconnecting, setIsReconnecting] = useState(false); // new state
     const [lastMessage, setLastMessage] = useState(null);
     const [boardState, setBoardState] = useState({ todo: [], inprogress: [], done: [] });
     const [connectedUsers, setConnectedUsers] = useState([]);
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
-    const localUserRef = useRef(null);
-
-    const getLocalUser = () => {
-        if (typeof window === "undefined") return null;
-        const stored = window.localStorage.getItem("board_user");
-        if (stored) {
-            try {
-                return JSON.parse(stored);
-            } catch {
-                // ignore
-            }
-        }
-        const user = {
-            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-            name: `User ${Math.floor(Math.random() * 9000) + 1000}`,
-            color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0")}`,
-        };
-        window.localStorage.setItem("board_user", JSON.stringify(user));
-        return user;
-    };
 
     // Connect to WebSocket
     const connect = useCallback(() => {
@@ -46,7 +25,6 @@ export function useWebSocket() {
         ws.onopen = () => {
             console.log('✅ WebSocket connected');
             setIsConnected(true);
-            setIsReconnecting(false);
         };
 
         ws.onmessage = (event) => {
@@ -57,33 +35,35 @@ export function useWebSocket() {
 
                 // Handle different message types
                 switch (data.type) {
-                    case 'USERS_UPDATE':
-                        setConnectedUsers(data.payload || []);
-                        break;
                     case 'INITIAL_STATE':
                         setBoardState(data.payload);
                         break;
+
+                    case 'USERS_UPDATE':
+                        setConnectedUsers(data.payload);
+                        break;
+
                     case 'TASK_ADDED':
                         setBoardState(prev => {
                             const newState = { ...prev };
                             const task = data.payload.task;
-                            newState[task.status] = [...newState[task.status], task];
+                            newState[task.status] = [...(newState[task.status] || []), task];
                             return newState;
                         });
                         break;
+
                     case 'TASK_UPDATED':
                         setBoardState(prev => {
                             const newState = { ...prev };
                             const task = data.payload.task;
-                            const oldStatus = data.payload.oldStatus;
                             const changedStatus = (data.payload.changes && data.payload.changes.status) || task.status;
 
-                            // FIRST: remove this task from every column (defense against stale state)
+                            // Remove this task from every column
                             Object.keys(newState).forEach(key => {
                                 newState[key] = newState[key].filter(t => t.id !== task.id);
                             });
 
-                            // SECOND: add it to the correct target column
+                            // Add it to the correct target column
                             if (!newState[changedStatus]) {
                                 newState[changedStatus] = [];
                             }
@@ -92,6 +72,7 @@ export function useWebSocket() {
                             return newState;
                         });
                         break;
+
                     case 'TASK_DELETED':
                         setBoardState(prev => {
                             const newState = { ...prev };
@@ -103,6 +84,7 @@ export function useWebSocket() {
                             return newState;
                         });
                         break;
+
                     default:
                         console.log('Unknown message type:', data.type);
                 }
@@ -114,8 +96,6 @@ export function useWebSocket() {
         ws.onclose = () => {
             console.log('❌ WebSocket disconnected');
             setIsConnected(false);
-            setIsReconnecting(true);
-            setConnectedUsers([]);
 
             // Auto-reconnect after 3 seconds
             reconnectTimeoutRef.current = setTimeout(() => {
@@ -158,12 +138,11 @@ export function useWebSocket() {
 
     return {
         isConnected,
-        isReconnecting,
         boardState,
         setBoardState, // Allow manual state updates
         lastMessage,
-        connectedUsers,
         sendMessage,
+        connectedUsers,
         reconnect: connect
     };
 }
